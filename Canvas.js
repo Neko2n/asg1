@@ -45,6 +45,14 @@ function setupWebGL() {
     console.log('Failed to get the rendering context for WebGL');
     return;
   }
+    // Create a buffer object
+    let vertexBuffer = gl.createBuffer();
+    if (!vertexBuffer) {
+      console.log('Failed to create the buffer object');
+      return -1;
+    }
+    // Bind the buffer object to target
+    gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
 }
 
 function connectVariablesToGLSL() {
@@ -76,18 +84,23 @@ function connectVariablesToGLSL() {
   }
 }
 
-let g_shapes = [];
-
+let g_shapes = [] // The shapes currently drawn to the screen
 let g_selectedColor = [1.0, 1.0, 1.0, 1.0]; // The color the user is currently drawing with
 let g_selectedSize = 10.0;
 let g_selectedSegments = 4;
 let g_selectedRotation = 0;
+let g_tool = 0;
+let last_clicked = null;
 
 function bindActions() {
   // Register function (event handler) to be called on a mouse press
   canvas.onmousedown = click;
   canvas.onmousemove = function(event) {
-    if (event.buttons == 1) { click(event); }
+    if (event.buttons == 0) {
+      last_clicked = null;
+    } else if (event.buttons == 1) {
+      click(event); 
+    }
   };
 
   document.getElementById('range_color_r')
@@ -101,9 +114,9 @@ function bindActions() {
     .addEventListener('mouseup', function() { g_selectedSize = this.value; });
 
   document.getElementById('button_clear')
-    .addEventListener('click', function() { 
+    .addEventListener('click', function() {
+      gl.clear(gl.COLOR_BUFFER_BIT);
       g_shapes = [];
-      renderShapes();
     });
 
   let slider_segmentCount = 10;
@@ -132,16 +145,58 @@ function bindActions() {
     .addEventListener('mouseup', function() {
       g_selectedRotation = this.value;
     });
+
+  document.getElementById('button_draw')
+    .addEventListener('click', drawPreset);
+
+  document.getElementById('button_tool_draw')
+    .addEventListener('click', function() {
+      g_tool = 0;
+    })
+  document.getElementById('button_tool_pan')
+    .addEventListener('click', function() {
+      g_tool = 1;
+    })
+  document.getElementById('button_tool_zoom')
+    .addEventListener('click', function() {
+      g_tool = 2;
+    })
 }
 
 function click(event) {
   let [x, y] = convertToGL(event.clientX, event.clientY, event.target.getBoundingClientRect());
-
-  // Store the shape properties to g_shapes array
-  let shape = new Shape([x, y], g_selectedColor.slice(), g_selectedSize, g_selectedSegments, g_selectedRotation);
-  g_shapes.push(shape);
-
-  renderShapes();
+  let delta;
+  if (last_clicked) {
+    delta = [x - last_clicked[0], y - last_clicked[1]];
+  } else {
+    delta = [0, 0];
+  }
+  switch (g_tool) {
+    case 0: // Draw tool
+      let shape = new Shape([x, y], g_selectedColor.slice(), g_selectedSize, g_selectedSegments, g_selectedRotation);
+      shape.render();
+      g_shapes.push(shape);
+      break;
+    case 1: // Pan tool
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      for (let shape of g_shapes) {
+        shape.position[0] += delta[0];
+        shape.position[1] += delta[1];
+        shape.render();
+      }
+      break;
+    case 2: // Zoom tool
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      let strength = delta[1];
+      for (let shape of g_shapes) {
+        shape.size *= 1 + strength;
+        shape.position[0] *= (1 + strength);
+        shape.position[1] *= (1 + strength);
+        shape.render();
+      }
+      break;
+  }
+  last_clicked = [x, y];
 }
 
 function convertToGL(x, y, rect) {
@@ -150,13 +205,65 @@ function convertToGL(x, y, rect) {
   return [x, y];
 }
 
-function renderShapes() {
-  // Clear <canvas>
-  gl.clear(gl.COLOR_BUFFER_BIT);
+function drawPreset() {
+  gl.vertexAttrib3f(a_Position, 0.0, 0.0, 0.0);
+  gl.uniform4f(u_FragColor, 0.5, 0.5, 0.6, 1.0);
+  
+  // Draw body
+  drawTriangle([0.0, -0.2,  0.1, -0.2,  0.1, -0.3]);
+  drawTriangle([0.0, -0.3,  0.0, -0.4,  0.1, -0.4]);
+  drawTriangle([-0.1, -0.3,  -0.1, -0.4,  0.0, -0.4]);
+  drawSquare([-0.1, -0.3]);
+  drawSquare([-0.1, -0.2]);
+  drawSquare([-0.1, -0.1]);
+  drawSquare([-0.1, 0.0]);
+  drawTriangle([0.0, 0.0,  0.1, 0.0,  0.0, 0.1]);
+  drawTriangle([0.0, 0.0,  0.1, 0.0,  0.1, -0.1]);
+  drawTriangle([0.1, -0.1,  0.2, -0.1,  0.2, -0.2]);
+  drawTriangle([0.1, 0.0,  0.2, -0.1,  0.1, -0.1]);
+  drawSquare([0.2, -0.2]);
+  drawSquare([0.2, -0.1]);
+  drawSquare([0.2, 0.0]);
+  drawSquare([0.2, 0.1]);
+  drawTriangle([0.3, 0.2,  0.3, 0.3,  0.2, 0.3]);
+  drawTriangle([0.2, 0.2,  0.2, 0.3,  0.1, 0.3]);
+  drawTriangle([0.1, 0.1,  0.1, 0.2,  0.2, 0.1]);
 
-  let len = g_shapes.length;
-  for(let i = 0; i < len; i++) {
-    let shape = g_shapes[i];
-    shape.render();
-  }
+  // Draw eyes
+  gl.uniform4f(u_FragColor, 1, 1, 1, 1);
+  drawTriangle([-0.1, -0.3,  0.0, -0.3,  0.0, -0.4]);
+  drawTriangle([0.2, 0.2,  0.2, 0.3,  0.3, 0.2]);
+
+  // Draw scales
+  gl.uniform4f(u_FragColor, 0.3, 0.3, 0.4, 1);
+  drawTriangle([-0.2, -0.3,  -0.1, -0.3,  -0.1, -0.4]);
+  drawTriangle([-0.2, -0.2,  -0.1, -0.2,  -0.1, -0.3]);
+  drawTriangle([-0.2, -0.1,  -0.1, -0.1,  -0.1, -0.2]);
+  drawTriangle([-0.2, 0.0,  -0.1, 0.0,  -0.1, -0.1]);
+  drawTriangle([-0.2, 0.1,  -0.1, 0.1,  -0.1, 0.0]);
+  drawTriangle([-0.1, 0.1,  -0.0, 0.1,  -0.0, 0.2]);
+  drawTriangle([0.3, 0.2,  0.3, 0.3,  0.4, 0.2]);
+  drawTriangle([0.3, 0.1,  0.3, 0.2,  0.4, 0.1]);
+  drawTriangle([0.3, 0.0,  0.3, 0.1,  0.4, 0.0]);
+  drawTriangle([0.3, -0.1,  0.3, 0.0,  0.4, -0.1]);
+  drawTriangle([0.3, -0.2,  0.3, -0.1,  0.4, -0.2]);
+  drawTriangle([0.2, -0.2,  0.3, -0.2,  0.2, -0.3]); 
+}
+
+function drawTriangle(vertices) {
+  // Write date into the buffer object
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.DYNAMIC_DRAW);
+  // Assign the buffer object to a_Position variable
+  gl.vertexAttribPointer(a_Position, 2, gl.FLOAT, false, 0, 0);
+  // Enable the assignment to a_Position variable
+  gl.enableVertexAttribArray(a_Position);
+  // Draw
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+}
+
+// Pos is the bottom-left of the square
+// This is used exclusively for drawPreset()
+function drawSquare(pos) {
+  drawTriangle([pos[0], pos[1],  pos[0], pos[1] + 0.1,  pos[0] + 0.1, pos[1]]);
+  drawTriangle([pos[0], pos[1] + 0.1,  pos[0] + 0.1, pos[1] + 0.1,  pos[0] + 0.1, pos[1]]);
 }
