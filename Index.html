@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>Change a point color</title>
+    <title>Draw Shapes</title>
   </head>
 
   <body onload="main()">
@@ -30,6 +30,12 @@
     </div>
     <div>
       <label>Rotation:</label><input type="range" id="range_rotation" min="0" max="360" step="1" value="0">
+    </div>
+    <div>
+      <p>Preset Art</p>
+      <img src="img/initial.jpg" width="400px">
+      <p></p>
+      <input type="button" id="button_draw" value="Draw">
     </div>
     <script src="../lib/webgl-utils.js"></script>
     <script src="../lib/webgl-debug.js"></script>
